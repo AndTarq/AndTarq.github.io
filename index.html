@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Punteggio Tennis Live</title>
+<style>
+  :root{
+    --court:#2e7d32; 
+    --court-dark:#246427;
+    --line:#ffffff; 
+    --panel:#ffffff;
+    --panel-muted:#f3f4f6;
+    --accent:#1e88e5;
+    --ok:#28a745; 
+    --danger:#d32f2f; 
+    --text:#0f172a;
+    --shadow: 0 10px 30px rgba(0,0,0,.22);
+  }
+
+  /* Base */
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    color:var(--text);
+    background: radial-gradient(120% 80% at 50% 0%, #3fa043 0%, var(--court) 60%);
+    display:flex; flex-direction:column; gap:clamp(10px,2vw,20px);
+    align-items:center;
+    padding: clamp(10px,2vw,20px);
+  }
+
+  h1{
+    margin: 0;
+    color:#fff;
+    letter-spacing:.3px;
+    text-shadow: 0 2px 8px rgba(0,0,0,.35);
+    font-size: clamp(20px, 4.8vw, 36px);
+    text-align:center;
+  }
+
+  /* Barra comandi */
+  .toolbar{
+    display:flex; flex-wrap:wrap; gap: clamp(8px,1.7vw,14px);
+    align-items:center; justify-content:center;
+    max-width: 1100px; width: min(96vw, 1100px);
+  }
+  .mode{
+    display:flex; gap: clamp(6px,1vw,10px); align-items:center;
+    background:rgba(255,255,255,.92);
+    padding: clamp(6px,1.2vw,10px) clamp(10px,1.6vw,14px);
+    border-radius: 12px;
+  }
+  .chip{
+    background:rgba(255,255,255,.95);
+    padding: clamp(6px,1.2vw,10px) clamp(10px,1.8vw,16px);
+    border-radius: 999px; 
+    font-weight: 650;
+    display:inline-flex; gap: .6em; align-items:center;
+    box-shadow: 0 2px 10px rgba(0,0,0,.12);
+    font-size: clamp(12px,2.6vw,16px);
+    border: 1px solid rgba(0,0,0,.05);
+  }
+  button.chip{ cursor:pointer; border:none }
+  .secondary{ background:var(--accent); color:#fff }
+  .finish{ background:var(--danger); color:#fff }
+  .ghost{ background:transparent; color:#fff; border:2px solid rgba(255,255,255,.8) }
+  .chip:disabled{ opacity:.6; cursor:not-allowed }
+
+  /* Inputs giocatori */
+  .players{
+    display:grid; gap: clamp(6px,1.5vw,12px);
+    grid-template-columns: repeat(2, minmax(160px,1fr));
+    max-width:1100px; width:min(96vw, 1100px);
+  }
+  .players.double{ grid-template-columns: repeat(4, minmax(130px,1fr)); }
+  .players input{
+    font-size: clamp(12px,2.9vw,16px);
+    padding: clamp(8px,1.8vw,12px) clamp(10px,2vw,14px);
+    border:1px solid #e5e7eb; border-radius: 12px; outline:none;
+    background:#fff;
+  }
+  .players input:disabled{opacity:.6}
+
+  /* Campo da tennis */
+  .courtWrap{
+    width: 100%;
+    display:flex; justify-content:center;
+  }
+  .court{
+    position:relative;
+    width: min(96vw, 1100px);
+    border: clamp(4px, .6vw, 6px) solid var(--line);
+    border-radius: clamp(10px, 2vw, 16px);
+    background: linear-gradient(to bottom, var(--court) 0 50%, var(--court-dark) 50% 100%);
+    padding: clamp(10px,2.2vw,18px);
+    box-shadow: var(--shadow);
+    overflow:hidden;
+
+    /* centra i contenitori interni */
+    display:flex; flex-direction:column; align-items:center; gap: clamp(10px, 2vw, 16px);
+  }
+  /* linee del campo (centrali, simmetriche) */
+  .court::before, .court::after{
+    content:"";
+    position:absolute; left:50%; transform:translateX(-50%);
+    background:var(--line); opacity:.65; z-index:0;
+  }
+  .court::before{ top:0; width: clamp(2px, .5vw, 4px); height:100%; }
+  .court::after{ top:50%; left:0; transform:none; width:100%; height: clamp(2px, .5vw, 4px); }
+
+  /* Scoreboard */
+  .scoreboard{
+    position:relative; z-index:1;
+    display:grid; gap: clamp(10px,2vw,16px);
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    max-width: min(92%, 1000px);
+  }
+  .panel{
+    background:var(--panel); border-radius: clamp(10px,1.8vw,14px);
+    padding: clamp(10px,2vw,14px);
+    box-shadow: 0 6px 18px rgba(0,0,0,.16);
+  }
+  .teamHeader{
+    display:flex; align-items:flex-start; justify-content:space-between; gap: clamp(8px,1.6vw,12px);
+    border-bottom:1px dashed #e5e7eb; padding-bottom: clamp(6px,1.4vw,10px); margin-bottom: clamp(8px,1.8vw,12px);
+  }
+  .teamName{ font-size: clamp(16px,3.8vw,20px); font-weight:800 }
+  .members{ font-size: clamp(10px,2.6vw,12px); opacity:.75 }
+  .scores{ display:flex; gap: clamp(6px,1.4vw,10px); align-items:center; font-size: clamp(12px,2.8vw,16px) }
+  .badge{
+    min-width: clamp(56px, 10vw, 72px);
+    text-align:center; padding: .6em .7em; border-radius: 10px; font-weight:800;
+    background: var(--panel-muted);
+  }
+  .big{ font-size: clamp(18px,5vw,28px) }
+
+  .panel button{
+    width:100%;
+    padding: .8em 1em;
+    font-size: clamp(12px,2.9vw,16px); font-weight:750;
+    border:none; border-radius: 10px; cursor:pointer; background:var(--ok); color:#fff;
+    margin-top: .5em;
+  }
+  .panel button:disabled{opacity:.5; cursor:not-allowed}
+
+  /* Statistiche */
+  .statsGrid{
+    position:relative; z-index:1;
+    display:grid; gap: clamp(10px,2vw,14px); 
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    max-width: min(92%, 1000px);
+  }
+  .statLine{
+    display:flex; justify-content:space-between; align-items:center; gap: clamp(8px,1.8vw,12px);
+    font-size: clamp(12px,2.9vw,16px); 
+    background:var(--panel); border-radius: 12px; 
+    padding: clamp(8px,1.8vw,12px) clamp(10px,2vw,14px);
+    box-shadow: 0 6px 18px rgba(0,0,0,.16);
+  }
+  .actions{ display:flex; gap: clamp(6px,1.4vw,10px) }
+  .actions button{ padding:.6em .8em; font-size: clamp(11px,2.7vw,14px); border:none; border-radius:10px; cursor:pointer }
+  .actions .secondary{ background:var(--accent); color:#fff }
+  .actions .finish{ background:var(--danger); color:#fff }
+
+  .footerRow{
+    position:relative; z-index:1;
+    display:flex; gap: clamp(8px,1.6vw,12px); justify-content:center; 
+    width:100%;
+  }
+
+  /* Mobile */
+  @media (max-width: 900px){
+    .scoreboard, .statsGrid{ grid-template-columns: 1fr; }
+    .players.double{ grid-template-columns: repeat(2, minmax(140px,1fr)); }
+  }
+  @media (max-width: 420px){
+    .players{ grid-template-columns: 1fr; }
+    .players.double{ grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <h1>Punteggio Tennis Live</h1>
+
+  <div class="toolbar">
+    <div class="mode">
+      <strong style="font-size:clamp(12px,2.8vw,16px)">Modalità:</strong>
+      <label style="font-size:clamp(12px,2.8vw,16px)"><input type="radio" name="mode" value="single" checked> Singolo</label>
+      <label style="font-size:clamp(12px,2.8vw,16px)"><input type="radio" name="mode" value="double"> Doppio</label>
+    </div>
+    <span class="chip">⏱ Tempo: <span id="matchTimer">00:00</span></span>
+    <button id="startBtn" class="chip secondary">▶️ Start</button>
+    <button id="finishBtn" class="chip finish" disabled>⛳ Finish</button>
+    <button id="saveBtn" class="chip">💾 Save</button>
+    <button id="resetBtn" class="chip ghost">🔁 Nuova partita</button>
+  </div>
+
+  <div id="playersBox" class="players">
+    <input type="text" id="p1a" placeholder="Giocatore 1" value="Giocatore 1">
+    <input type="text" id="p2a" placeholder="Giocatore 2" value="Giocatore 2">
+    <input type="text" id="p1b" placeholder="Compagno 1 (doppio)" style="display:none">
+    <input type="text" id="p2b" placeholder="Compagno 2 (doppio)" style="display:none">
+  </div>
+
+  <div class="courtWrap">
+    <div class="court" aria-label="Campo da tennis, pannelli centrati">
+      <div class="scoreboard">
+        <div class="panel">
+          <div class="teamHeader">
+            <div>
+              <div id="team1Name" class="teamName">Squadra A</div>
+              <div id="team1Members" class="members">Giocatore 1</div>
+            </div>
+            <div class="scores">
+              <div class="badge">Set: <span id="p1Sets">0</span></div>
+              <div class="badge">Game: <span id="p1Games">0</span></div>
+              <div class="badge big">Punti: <span id="p1Points">0</span></div>
+            </div>
+          </div>
+          <button id="btnP1">+ Punto Squadra A</button>
+        </div>
+
+        <div class="panel">
+          <div class="teamHeader">
+            <div>
+              <div id="team2Name" class="teamName">Squadra B</div>
+              <div id="team2Members" class="members">Giocatore 2</div>
+            </div>
+            <div class="scores">
+              <div class="badge">Set: <span id="p2Sets">0</span></div>
+              <div class="badge">Game: <span id="p2Games">0</span></div>
+              <div class="badge big">Punti: <span id="p2Points">0</span></div>
+            </div>
+          </div>
+          <button id="btnP2">+ Punto Squadra B</button>
+        </div>
+      </div>
+
+      <div id="statsGrid" class="statsGrid"></div>
+
+      <div class="footerRow">
+        <span class="chip">📢 Tie-break automatico a 6–6 (win by 2)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT in fondo per ordine di caricamento semplice e robusto -->
+  <script>
+    /* ---- Stato ---- */
+    let p1Points=0, p2Points=0;   // 0..3 = 0/15/30/40 ; 4 usato solo per visualizzare AD
+    let p1Games=0, p2Games=0;
+    let p1Sets=0, p2Sets=0;
+
+    let inTieBreak=false;
+    let matchStarted=false, matchFinished=false;
+
+    // timer
+    let seconds=0, timerId=null;
+
+    // log eventi (punti, vincenti, errori)
+    const eventLog=[];
+
+    const pointNames = ["0","15","30","40"];
+
+    /* ---- Statistiche per giocatore ---- */
+    const stats = {
+      A1:{winners:0,errors:0},
+      A2:{winners:0,errors:0},
+      B1:{winners:0,errors:0},
+      B2:{winners:0,errors:0},
+    };
+
+    /* ---- Elements ---- */
+    const els = {
+      team1Name: document.getElementById("team1Name"),
+      team2Name: document.getElementById("team2Name"),
+      team1Members: document.getElementById("team1Members"),
+      team2Members: document.getElementById("team2Members"),
+      p1Points: document.getElementById("p1Points"),
+      p2Points: document.getElementById("p2Points"),
+      p1Games: document.getElementById("p1Games"),
+      p2Games: document.getElementById("p2Games"),
+      p1Sets: document.getElementById("p1Sets"),
+      p2Sets: document.getElementById("p2Sets"),
+      timer: document.getElementById("matchTimer"),
+      startBtn: document.getElementById("startBtn"),
+      finishBtn: document.getElementById("finishBtn"),
+      saveBtn: document.getElementById("saveBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      btnP1: document.getElementById("btnP1"),
+      btnP2: document.getElementById("btnP2"),
+      playersBox: document.getElementById("playersBox"),
+      statsGrid: document.getElementById("statsGrid"),
+      p1a: document.getElementById("p1a"),
+      p1b: document.getElementById("p1b"),
+      p2a: document.getElementById("p2a"),
+      p2b: document.getElementById("p2b"),
+    };
+
+    function isDouble(){
+      return document.querySelector('input[name="mode"]:checked').value === 'double';
+    }
+
+    /* ---- Nomi e display ---- */
+    function composeNames(){
+      if(isDouble()){
+        const a1 = els.p1a.value || "Giocatore A1";
+        const a2 = els.p1b.value || "Giocatore A2";
+        const b1 = els.p2a.value || "Giocatore B1";
+        const b2 = els.p2b.value || "Giocatore B2";
+        return {
+          t1Name: "Squadra A",
+          t2Name: "Squadra B",
+          t1Members: `${a1} & ${a2}`,
+          t2Members: `${b1} & ${b2}`,
+          labels: {A1:a1,A2:a2,B1:b1,B2:b2}
+        };
+      } else {
+        const a = els.p1a.value || "Giocatore 1";
+        const b = els.p2a.value || "Giocatore 2";
+        return {
+          t1Name: a,
+          t2Name: b,
+          t1Members: "—",
+          t2Members: "—",
+          labels: {A1:a,B1:b}
+        };
+      }
+    }
+
+    function displayPoints(pA, pB){
+      if(inTieBreak){ return {a:String(pA), b:String(pB)}; }
+      if(pA >= 3 && pB >= 3){
+        if(pA === pB) return {a:"40", b:"40"};
+        if(pA > pB) return {a:"AD", b:"40"};
+        return {a:"40", b:"AD"};
+      }
+      return {a: pointNames[pA] ?? "0", b: pointNames[pB] ?? "0"};
+    }
+
+    function updateDisplay(){
+      const names = composeNames();
+      els.team1Name.textContent = names.t1Name;
+      els.team2Name.textContent = names.t2Name;
+      els.team1Members.textContent = names.t1Members;
+      els.team2Members.textContent = names.t2Members;
+
+      const pts = displayPoints(p1Points, p2Points);
+      els.p1Points.textContent = pts.a;
+      els.p2Points.textContent = pts.b;
+
+      els.p1Games.textContent = p1Games;
+      els.p2Games.textContent = p2Games;
+      els.p1Sets.textContent = p1Sets;
+      els.p2Sets.textContent = p2Sets;
+
+      const canScore = matchStarted && !matchFinished;
+      els.btnP1.disabled = !canScore;
+      els.btnP2.disabled = !canScore;
+
+      // blocca input/mode dopo start
+      [...document.querySelectorAll('input[name="mode"]')].forEach(r => r.disabled = matchStarted);
+      [els.p1a, els.p1b, els.p2a, els.p2b].forEach(inp => inp.disabled = matchStarted);
+
+      renderStats();
+    }
+
+    /* ---- Statistiche dinamiche ---- */
+    function statRow(code, label, s){
+      return `
+        <div class="statLine">
+          <div><strong>${label}</strong> — 🎯 ${s.winners} vincenti | ❌ ${s.errors} errori</div>
+          <div class="actions">
+            <button class="secondary" data-win="${code}">+ Vincente</button>
+            <button class="finish" data-err="${code}">+ Errore</button>
+          </div>
+        </div>`;
+    }
+
+    function renderStats(){
+      const names = composeNames();
+      const dbl = isDouble();
+      const rows = [];
+      if(dbl){
+        rows.push(statRow('A1', names.labels.A1, stats.A1));
+        rows.push(statRow('A2', names.labels.A2, stats.A2));
+        rows.push(statRow('B1', names.labels.B1, stats.B1));
+        rows.push(statRow('B2', names.labels.B2, stats.B2));
+      } else {
+        rows.push(statRow('A1', names.labels.A1, stats.A1));
+        rows.push(statRow('B1', names.labels.B1, stats.B1));
+      }
+      els.statsGrid.innerHTML = rows.join('');
+
+      const canScore = matchStarted && !matchFinished;
+      els.statsGrid.querySelectorAll('[data-win]').forEach(btn=>{
+        btn.disabled = !canScore;
+        btn.addEventListener('click', ()=> addWinner(btn.getAttribute('data-win')));
+      });
+      els.statsGrid.querySelectorAll('[data-err]').forEach(btn=>{
+        btn.disabled = !canScore;
+        btn.addEventListener('click', ()=> addError(btn.getAttribute('data-err')));
+      });
+    }
+
+    /* ---- Vantaggi corretti ---- */
+    function addPoint(team){ // 1=A, 2=B
+      if(!matchStarted || matchFinished) return;
+      eventLog.push({t:Date.now(), type:'point', team: team===1 ? 'A' : 'B'});
+
+      if(inTieBreak){
+        if(team===1) p1Points++; else p2Points++;
+        const diff = Math.abs(p1Points - p2Points);
+        if((p1Points >= 7 || p2Points >= 7) && diff >= 2){
+          endGame(team, true);
+          inTieBreak = false;
+        }
+        updateDisplay(); return;
+      }
+
+      if(p1Points >= 3 && p2Points >= 3){
+        if(p1Points === p2Points){
+          if(team===1) p1Points = 4; else p2Points = 4; // vantaggio
+        } else {
+          if(team===1){
+            if(p1Points > p2Points){ endGame(1); }
+            else { p1Points = 3; p2Points = 3; } // ritorno a deuce
+          } else {
+            if(p2Points > p1Points){ endGame(2); }
+            else { p1Points = 3; p2Points = 3; }
+          }
+        }
+        updateDisplay(); return;
+      }
+
+      if(team===1){
+        p1Points++;
+        if(p1Points === 4 && p2Points <= 2){ endGame(1); }
+      } else {
+        p2Points++;
+        if(p2Points === 4 && p1Points <= 2){ endGame(2); }
+      }
+      updateDisplay();
+    }
+
+    function endGame(winner, fromTiebreak=false){
+      if(winner===1) p1Games++; else p2Games++;
+      p1Points = 0; p2Points = 0;
+
+      if(!fromTiebreak && p1Games === 6 && p2Games === 6){
+        inTieBreak = true; return;
+      }
+      if((p1Games >= 6 || p2Games >= 6) && Math.abs(p1Games - p2Games) >= 2){
+        if(p1Games > p2Games) p1Sets++; else p2Sets++;
+        p1Games = 0; p2Games = 0;
+      }
+      if(fromTiebreak){
+        if(winner===1) p1Sets++; else p2Sets++;
+        p1Games = 0; p2Games = 0;
+      }
+    }
+
+    /* ---- Statistiche per giocatore ---- */
+    function addWinner(code){
+      if(!matchStarted || matchFinished) return;
+      stats[code].winners++;
+      eventLog.push({t:Date.now(), type:'winner', player:code});
+      updateDisplay();
+    }
+    function addError(code){
+      if(!matchStarted || matchFinished) return;
+      stats[code].errors++;
+      eventLog.push({t:Date.now(), type:'error', player:code});
+      updateDisplay();
+    }
+
+    /* ---- Timer ---- */
+    function startTimer(){
+      if(timerId) return;
+      timerId = setInterval(()=>{
+        seconds++;
+        const m = String(Math.floor(seconds/60)).padStart(2,'0');
+        const s = String(seconds%60).padStart(2,'0');
+        els.timer.textContent = `${m}:${s}`;
+      },1000);
+    }
+    function stopTimer(){
+      if(timerId){ clearInterval(timerId); timerId=null; }
+    }
+
+    /* ---- Save JSON ---- */
+    function saveMatch(){
+      const names = composeNames();
+      const data = {
+        timestamp: new Date().toISOString(),
+        mode: isDouble() ? 'double' : 'single',
+        players: {
+          A1: names.labels.A1 || null,
+          A2: isDouble() ? names.labels.A2 : null,
+          B1: names.labels.B1 || null,
+          B2: isDouble() ? names.labels.B2 : null,
+        },
+        duration_seconds: seconds,
+        score: {
+          sets: {A: p1Sets, B: p2Sets},
+          games_current_set: {A: p1Games, B: p2Games},
+          points_current_game: inTieBreak ? {A: p1Points, B: p2Points, tiebreak:true}
+                                          : {A: p1Points, B: p2Points, display: displayPoints(p1Points,p2Points)}
+        },
+        stats: {
+          A1: {...stats.A1}, A2: isDouble()? {...stats.A2} : null,
+          B1: {...stats.B1}, B2: isDouble()? {...stats.B2} : null,
+        },
+        inTieBreak,
+        matchStarted, matchFinished,
+        events: eventLog
+      };
+
+      const d = new Date();
+      const pad = (n)=> String(n).padStart(2,'0');
+      const stamp = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+      const mode = isDouble()? 'double' : 'single';
+      const fileName = `tennis_match_${mode}_${stamp}.json`;
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+    }
+
+    /* ---- Eventi UI ---- */
+    els.btnP1.addEventListener('click', ()=>addPoint(1));
+    els.btnP2.addEventListener('click', ()=>addPoint(2));
+
+    els.startBtn.addEventListener('click', ()=>{
+      if(matchStarted) return;
+      matchStarted = true; matchFinished = false;
+      els.finishBtn.disabled = false;
+      startTimer();
+      updateDisplay();
+    });
+    els.finishBtn.addEventListener('click', ()=>{
+      if(!matchStarted || matchFinished) return;
+      matchFinished = true;
+      els.finishBtn.disabled = true;
+      stopTimer();
+      updateDisplay();
+    });
+    els.saveBtn.addEventListener('click', saveMatch);
+
+    els.resetBtn.addEventListener('click', ()=>{
+      p1Points=p2Points=0;
+      p1Games=p2Games=0;
+      p1Sets=p2Sets=0;
+      inTieBreak=false;
+      matchStarted=false; matchFinished=false;
+
+      stats.A1={winners:0,errors:0};
+      stats.A2={winners:0,errors:0};
+      stats.B1={winners:0,errors:0};
+      stats.B2={winners:0,errors:0};
+      eventLog.length=0;
+
+      stopTimer(); seconds=0; els.timer.textContent="00:00";
+      els.finishBtn.disabled = true;
+
+      [...document.querySelectorAll('input[name="mode"]')].forEach(r => r.disabled = false);
+      [els.p1a, els.p1b, els.p2a, els.p2b].forEach(inp => inp.disabled = false);
+
+      updateDisplay();
+    });
+
+    document.querySelectorAll('input[name="mode"]').forEach(r=>{
+      r.addEventListener('change', ()=>{
+        const dbl = isDouble();
+        els.playersBox.classList.toggle('double', dbl);
+        els.p1b.style.display = dbl ? '' : 'none';
+        els.p2b.style.display = dbl ? '' : 'none';
+        updateDisplay();
+      });
+    });
+
+    [els.p1a, els.p1b, els.p2a, els.p2b].forEach(inp=>inp.addEventListener('input', updateDisplay));
+
+    /* init */
+    updateDisplay();
+  </script>
+</body>
+</html>
